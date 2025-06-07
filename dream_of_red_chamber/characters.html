@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>红楼梦 Character Relationships</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: #fff;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #d4af37;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #ccc;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+
+        #graph {
+            width: 100%;
+            height: 700px;
+            border: 2px solid #d4af37;
+            border-radius: 10px;
+            background: radial-gradient(ellipse at center, #2a2a4e 0%, #1a1a2e 100%);
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
+        }
+
+        .node {
+            cursor: pointer;
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));
+        }
+
+        .node:hover {
+            filter: drop-shadow(0 0 10px rgba(255,255,255,0.8));
+        }
+
+        .link {
+            stroke-opacity: 0.8;
+            stroke-width: 2px;
+        }
+
+        .node-label {
+            font-size: 12px;
+            font-weight: bold;
+            text-anchor: middle;
+            pointer-events: none;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+
+        .legend {
+            position: absolute;
+            top: 120px;
+            right: 30px;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #d4af37;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            margin-right: 8px;
+            border-radius: 50%;
+        }
+
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: #d4af37;
+            color: #1a1a2e;
+            border: none;
+            padding: 8px 16px;
+            margin: 0 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #f4cf47;
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>红楼梦</h1>
+        <p class="subtitle">Dream of the Red Chamber - Character Relationships</p>
+
+        <div class="controls">
+            <button onclick="centerGraph()">Center View</button>
+            <button onclick="resetZoom()">Reset Zoom</button>
+        </div>
+
+        <div style="position: relative;">
+            <svg id="graph"></svg>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff6b6b;"></div>
+                    <span>Main Characters</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4ecdc4;"></div>
+                    <span>Jia Family</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #45b7d1;"></div>
+                    <span>Lin/Xue Family</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #96ceb4;"></div>
+                    <span>Servants</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #feca57;"></div>
+                    <span>Other Noble Families</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Character data for 红楼梦
+        const nodes = [
+            // Main characters
+            { id: "贾宝玉", name: "贾宝玉 (Jia Baoyu)", group: "main", size: 25 },
+            { id: "林黛玉", name: "林黛玉 (Lin Daiyu)", group: "main", size: 22 },
+            { id: "薛宝钗", name: "薛宝钗 (Xue Baochai)", group: "main", size: 20 },
+
+            // Jia family elders
+            { id: "贾母", name: "贾母 (Grandmother Jia)", group: "jia", size: 18 },
+            { id: "贾政", name: "贾政 (Jia Zheng)", group: "jia", size: 16 },
+            { id: "王夫人", name: "王夫人 (Lady Wang)", group: "jia", size: 15 },
+            { id: "贾赦", name: "贾赦 (Jia She)", group: "jia", size: 14 },
+            { id: "邢夫人", name: "邢夫人 (Lady Xing)", group: "jia", size: 12 },
+
+            // Jia family younger generation
+            { id: "贾珠", name: "贾珠 (Jia Zhu)", group: "jia", size: 10 },
+            { id: "李纨", name: "李纨 (Li Wan)", group: "jia", size: 12 },
+            { id: "贾琏", name: "贾琏 (Jia Lian)", group: "jia", size: 14 },
+            { id: "王熙凤", name: "王熙凤 (Wang Xifeng)", group: "jia", size: 18 },
+            { id: "贾迎春", name: "贾迎春 (Jia Yingchun)", group: "jia", size: 10 },
+            { id: "贾探春", name: "贾探春 (Jia Tanchun)", group: "jia", size: 12 },
+            { id: "贾惜春", name: "贾惜春 (Jia Xichun)", group: "jia", size: 10 },
+
+            // Lin/Xue families
+            { id: "林如海", name: "林如海 (Lin Ruhai)", group: "other_family", size: 8 },
+            { id: "薛姨妈", name: "薛姨妈 (Aunt Xue)", group: "other_family", size: 12 },
+            { id: "薛蟠", name: "薛蟠 (Xue Pan)", group: "other_family", size: 10 },
+
+            // Important servants
+            { id: "袭人", name: "袭人 (Xiren)", group: "servant", size: 14 },
+            { id: "晴雯", name: "晴雯 (Qingwen)", group: "servant", size: 12 },
+            { id: "紫鹃", name: "紫鹃 (Zijuan)", group: "servant", size: 10 },
+            { id: "平儿", name: "平儿 (Ping'er)", group: "servant", size: 10 },
+
+            // Other notable characters
+            { id: "史湘云", name: "史湘云 (Shi Xiangyun)", group: "other_family", size: 12 },
+            { id: "妙玉", name: "妙玉 (Miaoyu)", group: "other_family", size: 8 }
+        ];
+
+        const links = [
+            // Family relationships
+            { source: "贾母", target: "贾政", type: "family", label: "母子" },
+            { source: "贾母", target: "贾赦", type: "family", label: "母子" },
+            { source: "贾政", target: "王夫人", type: "family", label: "夫妻" },
+            { source: "贾赦", target: "邢夫人", type: "family", label: "夫妻" },
+            { source: "贾政", target: "贾宝玉", type: "family", label: "父子" },
+            { source: "王夫人", target: "贾宝玉", type: "family", label: "母子" },
+            { source: "贾政", target: "贾珠", type: "family", label: "父子" },
+            { source: "贾珠", target: "李纨", type: "family", label: "夫妻" },
+            { source: "贾赦", target: "贾琏", type: "family", label: "父子" },
+            { source: "贾琏", target: "王熙凤", type: "family", label: "夫妻" },
+            { source: "贾政", target: "贾探春", type: "family", label: "父女" },
+            { source: "贾赦", target: "贾迎春", type: "family", label: "父女" },
+            { source: "贾母", target: "贾惜春", type: "family", label: "祖孙" },
+
+            // Extended family
+            { source: "林如海", target: "林黛玉", type: "family", label: "父女" },
+            { source: "薛姨妈", target: "薛宝钗", type: "family", label: "母女" },
+            { source: "薛姨妈", target: "薛蟠", type: "family", label: "母子" },
+            { source: "王夫人", target: "薛姨妈", type: "family", label: "姐妹" },
+
+            // Romantic relationships
+            { source: "贾宝玉", target: "林黛玉", type: "romantic", label: "恋人" },
+            { source: "贾宝玉", target: "薛宝钗", type: "romantic", label: "夫妻" },
+
+            // Master-servant relationships
+            { source: "贾宝玉", target: "袭人", type: "master_servant", label: "主仆" },
+            { source: "贾宝玉", target: "晴雯", type: "master_servant", label: "主仆" },
+            { source: "林黛玉", target: "紫鹃", type: "master_servant", label: "主仆" },
+            { source: "王熙凤", target: "平儿", type: "master_servant", label: "主仆" },
+
+            // Close friendships
+            { source: "林黛玉", target: "史湘云", type: "friendship", label: "好友" },
+            { source: "薛宝钗", target: "史湘云", type: "friendship", label: "好友" },
+            { source: "贾宝玉", target: "史湘云", type: "friendship", label: "表兄妹" },
+
+            // Complex relationships
+            { source: "贾母", target: "林黛玉", type: "family", label: "祖孙" },
+            { source: "贾母", target: "薛宝钗", type: "friendship", label: "喜爱" },
+            { source: "王夫人", target: "薛宝钗", type: "family", label: "姨甥" }
+        ];
+
+        // Set up dimensions
+        const width = 1160;
+        const height = 700;
+
+        // Create SVG
+        const svg = d3.select("#graph")
+            .attr("width", width)
+            .attr("height", height);
+
+        // Add zoom behavior
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 4])
+            .on("zoom", zoomed);
+
+        svg.call(zoom);
+
+        const g = svg.append("g");
+
+        // Color scale for different groups
+        const color = d3.scaleOrdinal()
+            .domain(["main", "jia", "other_family", "servant"])
+            .range(["#ff6b6b", "#4ecdc4", "#45b7d1", "#96ceb4", "#feca57"]);
+
+        // Link color scale
+        const linkColor = d3.scaleOrdinal()
+            .domain(["family", "romantic", "master_servant", "friendship"])
+            .range(["#ffffff", "#ff69b4", "#ffd700", "#98fb98"]);
+
+        // Create force simulation
+        const simulation = d3.forceSimulation(nodes)
+            .force("link", d3.forceLink(links).id(d => d.id).distance(100))
+            .force("charge", d3.forceManyBody().strength(-300))
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("collision", d3.forceCollide().radius(d => d.size + 5));
+
+        // Add links
+        const link = g.append("g")
+            .selectAll("line")
+            .data(links)
+            .enter().append("line")
+            .attr("class", "link")
+            .style("stroke", d => linkColor(d.type))
+            .style("stroke-width", d => d.type === "romantic" ? 4 : 2)
+            .style("stroke-dasharray", d => d.type === "friendship" ? "5,5" : "none");
+
+        // Add nodes
+        const node = g.append("g")
+            .selectAll("circle")
+            .data(nodes)
+            .enter().append("circle")
+            .attr("class", "node")
+            .attr("r", d => d.size)
+            .attr("fill", d => color(d.group))
+            .attr("stroke", "#fff")
+            .attr("stroke-width", 2)
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+
+        // Add labels
+        const labels = g.append("g")
+            .selectAll("text")
+            .data(nodes)
+            .enter().append("text")
+            .attr("class", "node-label")
+            .attr("dy", ".35em")
+            .style("fill", "#fff")
+            .style("font-size", d => Math.max(8, d.size / 2) + "px")
+            .text(d => d.id);
+
+        // Add tooltips
+        node.append("title")
+            .text(d => d.name);
+
+        // Update positions on simulation tick
+        simulation.on("tick", () => {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            node
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y);
+
+            labels
+                .attr("x", d => d.x)
+                .attr("y", d => d.y);
+        });
+
+        // Drag functions
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+
+        // Zoom function
+        function zoomed(event) {
+            g.attr("transform", event.transform);
+        }
+
+        // Control functions
+        function centerGraph() {
+            svg.transition().duration(750).call(
+                zoom.transform,
+                d3.zoomIdentity.translate(width / 2, height / 2).scale(1)
+            );
+        }
+
+        function resetZoom() {
+            svg.transition().duration(750).call(
+                zoom.transform,
+                d3.zoomIdentity
+            );
+        }
+
+        // Add interactivity
+        node.on("click", function(event, d) {
+            // Highlight connected nodes
+            const connectedNodes = new Set();
+            connectedNodes.add(d.id);
+
+            links.forEach(link => {
+                if (link.source.id === d.id) connectedNodes.add(link.target.id);
+                if (link.target.id === d.id) connectedNodes.add(link.source.id);
+            });
+
+            node.style("opacity", n => connectedNodes.has(n.id) ? 1 : 0.3);
+            link.style("opacity", l =>
+                l.source.id === d.id || l.target.id === d.id ? 1 : 0.2
+            );
+            labels.style("opacity", n => connectedNodes.has(n.id) ? 1 : 0.3);
+        });
+
+        // Reset highlighting on background click
+        svg.on("click", function(event) {
+            if (event.target === this) {
+                node.style("opacity", 1);
+                link.style("opacity", 0.8);
+                labels.style("opacity", 1);
+            }
+        });
+    </script>
+</body>
+</html>
